@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDashboard } from '../hooks/useDashboard';
-import { getAvailabilityForRange, DayAvailability } from '../utils/availabilityUtils';
+import { getAvailabilityForRange, getAvailabilityForDate, DayAvailability } from '../utils/availabilityUtils';
 import { formatDateLocal } from '../utils/dateUtils';
 import { clientsStorage, appointmentsStorage, Client } from '../utils/storage';
 
@@ -17,10 +17,46 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const [isAvailabilityLoading, setIsAvailabilityLoading] = useState(false);
     const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
 
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [isLoadingDateSlots, setIsLoadingDateSlots] = useState(false);
     const [showSharePicker, setShowSharePicker] = useState(false);
     const [clientSearch, setClientSearch] = useState('');
     const [clients, setClients] = useState<Client[]>([]);
     const [isSharing, setIsSharing] = useState(false);
+    const [shareDayData, setShareDayData] = useState<DayAvailability | null>(null);
+
+    // Generate next 14 days for date picker
+    const datePickerDays = useMemo(() => {
+        const days: Date[] = [];
+        const today = new Date();
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            days.push(d);
+        }
+        return days;
+    }, []);
+
+    const handleDatePickerSelect = async (date: Date) => {
+        setIsLoadingDateSlots(true);
+        try {
+            const dayData = await getAvailabilityForDate(date);
+            setShareDayData(dayData);
+        } catch (e) {
+            console.error(e);
+            setShareDayData(null);
+        } finally {
+            setIsLoadingDateSlots(false);
+            setShowDatePicker(false);
+            setShowSharePicker(true);
+        }
+    };
+
+    const handleDatePickerSkip = () => {
+        setShareDayData(null);
+        setShowDatePicker(false);
+        setShowSharePicker(true);
+    };
 
     useEffect(() => {
         if (showSharePicker) {
@@ -49,29 +85,44 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const handleShareAvailability = async (client: Client) => {
         setIsSharing(true);
         try {
-            const data = await getAvailabilityForRange(3);
-            let message = `Olá ${client.name}! 👋\n\nAqui estão nossos horários disponíveis para os próximos dias:\n\n`;
+            let message: string;
 
-            data.forEach(day => {
+            if (shareDayData) {
+                // Share a single selected day
+                const day = shareDayData;
                 const dateFmt = day.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                message += `📅 *${day.dayName} (${dateFmt})*\n`;
+                message = `Olá ${client.name}! 👋\n\nAqui estão nossos horários disponíveis para *${day.dayName} (${dateFmt})*:\n\n`;
                 if (day.isClosed || day.slots.length === 0) {
                     message += `Indisponível\n`;
                 } else {
-                    // Limit to first 12 slots to avoid too long messages
                     const displaySlots = day.slots.slice(0, 12);
-                    message += `${displaySlots.join(', ')}${day.slots.length > 12 ? '...' : ''}\n`;
+                    message += `🕐 ${displaySlots.join(', ')}${day.slots.length > 12 ? '...' : ''}\n`;
                 }
-                message += '\n';
-            });
-
-            message += `Para agendar, mande uma mensagem por aqui!`;
+                message += `\nPara agendar, mande uma mensagem por aqui!`;
+            } else {
+                // Share all upcoming days (original behavior)
+                const data = await getAvailabilityForRange(3);
+                message = `Olá ${client.name}! 👋\n\nAqui estão nossos horários disponíveis para os próximos dias:\n\n`;
+                data.forEach(day => {
+                    const dateFmt = day.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    message += `📅 *${day.dayName} (${dateFmt})*\n`;
+                    if (day.isClosed || day.slots.length === 0) {
+                        message += `Indisponível\n`;
+                    } else {
+                        const displaySlots = day.slots.slice(0, 12);
+                        message += `${displaySlots.join(', ')}${day.slots.length > 12 ? '...' : ''}\n`;
+                    }
+                    message += '\n';
+                });
+                message += `Para agendar, mande uma mensagem por aqui!`;
+            }
 
             const encoded = encodeURIComponent(message);
             const phone = client.phone.replace(/\D/g, '');
             const finalPhone = phone.startsWith('55') ? phone : `55${phone}`;
             window.open(`https://wa.me/${finalPhone}?text=${encoded}`, '_blank');
             setShowSharePicker(false);
+            setShareDayData(null);
         } finally {
             setIsSharing(false);
         }
@@ -172,7 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Próximas Vagas</span>
                         </button>
                         <button
-                            onClick={() => setShowSharePicker(true)}
+                            onClick={() => setShowDatePicker(true)}
                             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:border-primary active:scale-95 transition-all shadow-sm"
                         >
                             <span className="material-symbols-outlined text-blue-400 text-3xl">share</span>
@@ -455,13 +506,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                                             {day.isClosed ? (
                                                 <p className="text-xs text-slate-400 font-medium italic">Nenhum horário disponível para este dia.</p>
                                             ) : (
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {day.slots.map(t => (
-                                                        <span key={t} className="px-2 py-1 bg-slate-50 dark:bg-slate-700/50 rounded text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-600">
-                                                            {t}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                                                <>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {day.slots.map(t => (
+                                                            <span key={t} className="px-2 py-1 bg-slate-50 dark:bg-slate-700/50 rounded text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-600">
+                                                                {t}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { setShareDayData(day); setShowSharePicker(true); }}
+                                                        className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-bold transition-colors active:scale-95"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">send</span>
+                                                        Enviar vagas via WhatsApp
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     </div>
@@ -477,14 +537,83 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 </div>
             )}
 
+            {/* Modal: Date Picker for Share */}
+            {showDatePicker && (
+                <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-500">
+                        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold tracking-tight">Escolher data</h3>
+                                <p className="text-xs text-slate-500 font-medium mt-0.5">Selecione o dia ou pule para enviar os próximos 3 dias</p>
+                            </div>
+                            <button onClick={() => setShowDatePicker(false)} className="text-slate-400">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div className="p-4 max-h-[60vh] overflow-y-auto">
+                            {isLoadingDateSlots ? (
+                                <div className="py-16 flex flex-col items-center gap-3">
+                                    <div className="size-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                                    <p className="text-sm font-bold text-slate-400">Carregando vagas...</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-2">
+                                    {datePickerDays.map(date => {
+                                        const dayName = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+                                        const dayNum = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                        const isToday = formatDateLocal(date) === formatDateLocal(new Date());
+                                        return (
+                                            <button
+                                                key={formatDateLocal(date)}
+                                                onClick={() => handleDatePickerSelect(date)}
+                                                className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-95 ${isToday
+                                                    ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-primary/50'
+                                                    }`}
+                                            >
+                                                <div className={`size-10 rounded-lg flex flex-col items-center justify-center ${isToday ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200'}`}>
+                                                    <span className="text-[9px] font-bold uppercase opacity-70">{dayName}</span>
+                                                    <span className="text-sm font-extrabold leading-none">{date.getDate()}</span>
+                                                </div>
+                                                <div>
+                                                    <p className={`text-xs font-bold capitalize ${isToday ? 'text-primary' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                        {isToday ? 'Hoje' : dayName}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-400">{dayNum}</p>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                onClick={handleDatePickerSkip}
+                                className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl text-sm"
+                            >
+                                Pular — Enviar próximos 3 dias
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal: Share Availability Picker */}
             {showSharePicker && (
                 <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-500">
                         <div className="p-5 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold tracking-tight">Para quem enviar?</h3>
-                                <button onClick={() => setShowSharePicker(false)} className="text-slate-400">
+                                <div>
+                                    <h3 className="text-lg font-bold tracking-tight">Para quem enviar?</h3>
+                                    {shareDayData && (
+                                        <p className="text-xs text-primary font-bold mt-0.5">
+                                            {shareDayData.dayName} • {shareDayData.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} — {shareDayData.slots.length} horários
+                                        </p>
+                                    )}
+                                </div>
+                                <button onClick={() => { setShowSharePicker(false); setShareDayData(null); }} className="text-slate-400">
                                     <span className="material-symbols-outlined">close</span>
                                 </button>
                             </div>

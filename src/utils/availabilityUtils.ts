@@ -41,6 +41,56 @@ const parseDuration = (dur: string): number => {
     return mins;
 };
 
+export const getAvailabilityForDate = async (targetDate: Date): Promise<DayAvailability> => {
+    const [configs, blocks] = await Promise.all([
+        scheduleStorage.getConfig(),
+        scheduleStorage.getBlocks()
+    ]);
+
+    const d = new Date(targetDate);
+    const dateStr = formatDateLocal(d);
+    const dayOfWeek = d.getDay();
+    const config = configs.find(c => c.day_index === dayOfWeek);
+    const isBlocked = blocks.some(b => b.block_date === dateStr);
+    const dayName = d.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase();
+
+    if (isBlocked || !config || !config.is_open) {
+        return { date: d, dateStr, dayName, isClosed: true, slots: [] };
+    }
+
+    const allTimes = generateTimesForDay(config.start_time, config.end_time);
+    const appts = await appointmentsStorage.getByDate(dateStr);
+
+    const occupied = new Set<string>();
+    for (const apt of appts) {
+        const start = apt.appointment_time;
+        const dur = parseDuration(apt.serviceDuration);
+        const slotsCount = Math.ceil(dur / 30);
+        const startIdx = allTimes.indexOf(start);
+        if (startIdx !== -1) {
+            for (let j = 0; j < slotsCount; j++) {
+                if (startIdx + j < allTimes.length) {
+                    occupied.add(allTimes[startIdx + j]);
+                }
+            }
+        }
+    }
+
+    let freeSlots = allTimes.filter(t => !occupied.has(t));
+
+    // Filter past times if today
+    const today = new Date();
+    if (formatDateLocal(d) === formatDateLocal(today)) {
+        const nowMins = today.getHours() * 60 + today.getMinutes();
+        freeSlots = freeSlots.filter(t => {
+            const [h, m] = t.split(':').map(Number);
+            return (h * 60 + m) > nowMins + 15;
+        });
+    }
+
+    return { date: d, dateStr, dayName, isClosed: freeSlots.length === 0, slots: freeSlots };
+};
+
 export const getAvailabilityForRange = async (daysCount: number): Promise<DayAvailability[]> => {
     const today = new Date();
     const result: DayAvailability[] = [];
