@@ -31,10 +31,15 @@ export const useClients = () => {
         loadClients();
     }, []);
 
-    const filteredClients = clients.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.phone.includes(search)
-    );
+    const filteredClients = clients.filter(c => {
+        const searchLower = search.toLowerCase();
+        const searchDigits = search.replace(/\D/g, '');
+        return (
+            c.name.toLowerCase().includes(searchLower) ||
+            c.phone.includes(search) ||
+            (searchDigits.length >= 4 && c.phone.replace(/\D/g, '').includes(searchDigits))
+        );
+    });
 
     const startNew = () => {
         setClientData({ name: '', phone: '', birthDate: '', notes: '' });
@@ -64,7 +69,7 @@ export const useClients = () => {
     };
 
     const handleSave = async () => {
-        if (!clientData.name || !clientData.phone) {
+        if (!clientData.name.trim() || !clientData.phone) {
             alert('Por favor, preencha nome e WhatsApp.');
             return;
         }
@@ -72,6 +77,16 @@ export const useClients = () => {
         const digits = clientData.phone.replace(/\D/g, '');
         if (digits.length < 10 || digits.length > 11) {
             alert('Número de WhatsApp inválido. Use o formato (XX) XXXXX-XXXX.');
+            return;
+        }
+
+        // Verificar telefone duplicado
+        const isDuplicate = clients.some(c => {
+            if (mode === 'edit' && editingClient && c.id === editingClient.id) return false;
+            return c.phone.replace(/\D/g, '') === digits;
+        });
+        if (isDuplicate) {
+            alert('Já existe um cliente cadastrado com este número de WhatsApp.');
             return;
         }
 

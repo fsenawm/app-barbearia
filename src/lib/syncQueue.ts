@@ -20,6 +20,8 @@ export async function enqueue(
     });
 }
 
+const MAX_RETRIES = 5;
+
 // ── Process all pending sync operations (FIFO) ──
 export async function processQueue(): Promise<{ processed: number; errors: number }> {
     if (!isOnline()) return { processed: 0, errors: 0 };
@@ -31,18 +33,27 @@ export async function processQueue(): Promise<{ processed: number; errors: numbe
     let errors = 0;
 
     for (const item of pending) {
+        const retryCount = item.retryCount ?? 0;
+
+        // Descartar itens com falhas permanentes para não bloquear a fila
+        if (retryCount >= MAX_RETRIES) {
+            console.warn(`[SyncQueue] Descartando item após ${MAX_RETRIES} tentativas:`, item);
+            await localDb.sync_queue.delete(item.autoId!);
+            continue;
+        }
+
         try {
             await executeSyncItem(item);
             await localDb.sync_queue.delete(item.autoId!);
             processed++;
         } catch (err) {
-            console.error(`[SyncQueue] Failed to sync ${item.table}/${item.operation}:`, err);
+            console.error(`[SyncQueue] Falha ao sincronizar ${item.table}/${item.operation} (tentativa ${retryCount + 1}/${MAX_RETRIES}):`, err);
             errors++;
-            // Don't delete failed items — they'll be retried next time
+            await localDb.sync_queue.update(item.autoId!, { retryCount: retryCount + 1 });
         }
     }
 
-    console.log(`[SyncQueue] Processed ${processed}, errors ${errors}`);
+    console.log(`[SyncQueue] Processados ${processed}, erros ${errors}`);
     return { processed, errors };
 }
 
@@ -62,8 +73,7 @@ async function executeSyncItem(item: SyncQueueItem): Promise<void> {
             break;
         }
         case 'upsert': {
-            const upsertOpts = table === 'schedule_config' ? { onConflict: 'day_index' } : {};
-            const { error } = await supabase.from(table).upsert(payload!, upsertOpts);
+            const { error } = await supabase.from(table).upsert(payload!, { onConflict: 'id' });
             if (error) throw error;
             break;
         }

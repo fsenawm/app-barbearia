@@ -4,9 +4,11 @@ interface LayoutProps {
     children: React.ReactNode;
     currentScreen: string;
     onNavigate: (screen: string) => void;
+    onSignOut: () => void;
+    userName: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentScreen, onNavigate }) => {
+const Layout: React.FC<LayoutProps> = ({ children, currentScreen, onNavigate, onSignOut, userName }) => {
     const navItems = [
         { id: 'dashboard', label: 'Início', icon: 'grid_view' },
         { id: 'agenda', label: 'Agenda', icon: 'calendar_today' },
@@ -15,8 +17,32 @@ const Layout: React.FC<LayoutProps> = ({ children, currentScreen, onNavigate }) 
         { id: 'servicos', label: 'Ajustes', icon: 'settings' },
     ];
 
+    const displayName = userName.includes('@') ? userName.split('@')[0] : userName;
+
     return (
         <div className="flex flex-col min-h-screen bg-background-light dark:bg-[#111a21] text-slate-900 dark:text-slate-100 font-['Manrope']">
+            {/* Header */}
+            <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[22px]" translate="no">content_cut</span>
+                    <span className="text-sm font-extrabold text-primary tracking-tight">BarberApp</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    {displayName && (
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[120px] font-medium capitalize">
+                            {displayName}
+                        </span>
+                    )}
+                    <button
+                        onClick={onSignOut}
+                        aria-label="Sair"
+                        className="flex items-center justify-center size-8 rounded-lg text-slate-400 hover:text-primary active:scale-95 transition-all"
+                    >
+                        <span className="material-symbols-outlined text-[20px]" translate="no">logout</span>
+                    </button>
+                </div>
+            </header>
+
             <main className="flex-1 overflow-y-auto pb-24">
                 {children}
             </main>

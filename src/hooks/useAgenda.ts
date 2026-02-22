@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { appointmentsStorage, scheduleStorage, AppointmentWithDetails } from '../utils/storage';
+import { formatDateLocal } from '../utils/dateUtils';
 
 export const useAgenda = () => {
     const today = new Date();
@@ -9,12 +10,14 @@ export const useAgenda = () => {
     const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [blockReason, setBlockReason] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState(false);
 
     // Load appointments for a given date
     const loadAppointments = useCallback(async (date: Date) => {
         setIsLoading(true);
+        setLoadError(false);
         try {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = formatDateLocal(date); // ✓ fuso local, não UTC
 
             // Check for blocks
             const blocks = await scheduleStorage.getBlocks();
@@ -26,6 +29,7 @@ export const useAgenda = () => {
         } catch {
             setAppointments([]);
             setBlockReason(null);
+            setLoadError(true);
         } finally {
             setIsLoading(false);
         }
@@ -141,6 +145,7 @@ export const useAgenda = () => {
         handleDelete,
         handleToggleStatus,
         blockReason,
+        loadError,
         reload: () => loadAppointments(selectedDate),
     };
 };

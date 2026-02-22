@@ -69,7 +69,12 @@ export const useDashboard = () => {
             const dayAppts = weeklyAppointments.filter(a => a.appointment_date === dateStr);
 
             const revenue = dayAppts.reduce((sum, a) => {
-                const priceStr = a.servicePrice?.replace(/[^\d,.-]/g, '').replace(',', '.') || '0';
+                // Remove R$, espaços e pontos de milhar; converte vírgula decimal para ponto
+                const priceStr = (a.servicePrice ?? '')
+                    .replace(/R\$\s*/g, '')
+                    .trim()
+                    .replace(/\./g, '')
+                    .replace(',', '.');
                 return sum + (parseFloat(priceStr) || 0);
             }, 0);
 

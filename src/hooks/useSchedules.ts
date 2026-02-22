@@ -57,17 +57,32 @@ export const useSchedules = () => {
             alert('Selecione uma data para o bloqueio.');
             return;
         }
+        // M3: impedir bloqueio duplicado
+        if (blocks.some(b => b.block_date === newBlockDate)) {
+            alert('Esta data já está bloqueada.');
+            return;
+        }
         try {
             const block = await scheduleStorage.addBlock(newBlockDate, newBlockReason);
             setBlocks(prev => [...prev, block]);
             setNewBlockDate('');
             setNewBlockReason('');
         } catch {
-            alert('Erro ao adicionar bloqueio. Verifique se a data já não está bloqueada.');
+            alert('Erro ao adicionar bloqueio.');
         }
-    }, [newBlockDate, newBlockReason]);
+    }, [newBlockDate, newBlockReason, blocks]);
 
     const handleSave = useCallback(async () => {
+        // M2: validar que horário de abertura < fechamento nos dias abertos
+        for (const day of weeklyRoutine) {
+            if (!day.is_open || day.start_time === '--:--' || day.end_time === '--:--') continue;
+            const [sh, sm] = day.start_time.split(':').map(Number);
+            const [eh, em] = day.end_time.split(':').map(Number);
+            if (sh * 60 + sm >= eh * 60 + em) {
+                alert(`${day.day_name}: o horário de abertura deve ser anterior ao de fechamento.`);
+                return;
+            }
+        }
         setIsSaving(true);
         try {
             await scheduleStorage.saveConfig(weeklyRoutine);

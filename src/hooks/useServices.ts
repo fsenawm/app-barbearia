@@ -24,6 +24,10 @@ export const useServices = () => {
     }, [services, search]);
 
     const handleAddService = async (newService: Omit<Service, 'id' | 'isPopular'>) => {
+        if (!newService.name.trim()) {
+            alert('O nome do serviço é obrigatório.');
+            return;
+        }
         setIsSaving(true);
         try {
             await servicesStorage.saveService({ ...newService, isPopular: false });

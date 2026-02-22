@@ -50,6 +50,7 @@ export interface SyncQueueItem {
     recordId: string;
     payload: Record<string, unknown> | null;
     createdAt: string;
+    retryCount?: number;
 }
 
 class BarbeariaDB extends Dexie {

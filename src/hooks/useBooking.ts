@@ -264,11 +264,13 @@ export const useBooking = () => {
     }, [allClients, clientSearch]);
 
     const handleBooking = async () => {
+        if (isSaving) return; // guard contra double-click
         if (!selectedClient) {
             alert('Por favor, selecione um cliente.');
             return;
         }
 
+        setIsSaving(true); // bloquear antes da verificação async
         const appointmentDateStr = formatDateLocal(selectedDate);
 
         // Final verification of availability
@@ -290,10 +292,9 @@ export const useBooking = () => {
                 return;
             }
         } catch {
-            // Fallback
+            // Fallback: prossegue mesmo se verificação falhar (salva localmente)
         }
 
-        setIsSaving(true);
         try {
             await appointmentsStorage.saveAppointment({
                 client_id: selectedClient.id,

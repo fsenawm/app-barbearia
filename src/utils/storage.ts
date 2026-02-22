@@ -44,6 +44,13 @@ function generateId(): string {
     return crypto.randomUUID();
 }
 
+// ── Helper: get current authenticated user ID ──
+async function getUserId(): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) throw new Error('Usuário não autenticado');
+    return session.user.id;
+}
+
 // ── Helper: map local appointment + local client/service → AppointmentWithDetails ──
 async function resolveAppointmentDetails(apt: Appointment): Promise<AppointmentWithDetails> {
     const client = await localDb.clients.get(apt.client_id);
@@ -78,12 +85,14 @@ export const clientsStorage = {
 
     saveClient: async (client: Omit<Client, 'id'>) => {
         const id = generateId();
+        const user_id = await getUserId();
         const record = {
             id,
             name: client.name,
             phone: client.phone,
             birth_date: client.birthDate || null,
             notes: client.notes || null,
+            user_id,
         };
 
         // Save locally first
@@ -167,6 +176,7 @@ export const servicesStorage = {
 
     saveService: async (service: Omit<Service, 'id'>) => {
         const id = generateId();
+        const user_id = await getUserId();
         const record = {
             id,
             name: service.name,
@@ -174,6 +184,7 @@ export const servicesStorage = {
             duration: service.duration,
             icon: service.icon,
             is_popular: service.isPopular,
+            user_id,
         };
 
         await localDb.services.put(record);
@@ -240,7 +251,8 @@ export const servicesStorage = {
 export const appointmentsStorage = {
     saveAppointment: async (appointment: Omit<Appointment, 'id'>) => {
         const id = generateId();
-        const record = { id, ...appointment };
+        const user_id = await getUserId();
+        const record = { id, ...appointment, user_id };
 
         await localDb.appointments.put(record);
 
@@ -366,14 +378,18 @@ export const scheduleStorage = {
 
         if (local.length === 0) {
             // Insert defaults locally
-            const defaults = DEFAULT_SCHEDULE.map((d, i) => ({ ...d, id: String(i) }));
+            const defaults = DEFAULT_SCHEDULE.map(d => ({ ...d, id: generateId() }));
             await localDb.schedule_config.bulkPut(defaults);
             local = defaults;
 
             // Also try to insert in Supabase if online
             if (isOnline()) {
                 try {
-                    await supabase.from('schedule_config').insert(DEFAULT_SCHEDULE);
+                    const user_id = await getUserId().catch(() => null);
+                    if (user_id) {
+                        const withUser = defaults.map(d => ({ ...d, user_id }));
+                        await supabase.from('schedule_config').insert(withUser);
+                    }
                 } catch { /* ignore */ }
             }
         }
@@ -385,9 +401,11 @@ export const scheduleStorage = {
         // Save locally
         await localDb.schedule_config.bulkPut(configs);
 
+        const user_id = await getUserId().catch(() => null);
+
         // Sync each config to Supabase
         for (const cfg of configs) {
-            const payload = {
+            const payload: Record<string, unknown> = {
                 id: cfg.id,
                 day_index: cfg.day_index,
                 day_name: cfg.day_name,
@@ -396,11 +414,12 @@ export const scheduleStorage = {
                 end_time: cfg.end_time,
                 updated_at: new Date().toISOString(),
             };
+            if (user_id) payload.user_id = user_id;
 
             if (isOnline()) {
                 try {
                     const { error } = await supabase.from('schedule_config')
-                        .upsert(payload, { onConflict: 'day_index' });
+                        .upsert(payload, { onConflict: 'id' });
                     if (error) throw error;
                 } catch (err) {
                     console.error('[Schedule] Online upsert failed, queued:', err);
@@ -419,7 +438,8 @@ export const scheduleStorage = {
 
     addBlock: async (blockDate: string, reason: string) => {
         const id = generateId();
-        const record = { id, block_date: blockDate, reason: reason || null };
+        const user_id = await getUserId();
+        const record = { id, block_date: blockDate, reason: reason || null, user_id };
 
         await localDb.schedule_blocks.put(record);
 
