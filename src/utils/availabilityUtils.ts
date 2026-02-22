@@ -28,13 +28,16 @@ const parseDuration = (dur: string): number => {
 const generateDynamicSlots = (startTime: string, endTime: string, appointments: any[]): string[] => {
     if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
 
-    const slots: string[] = [];
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
+    const startMins = sh * 60 + sm;
     const endMins = eh * 60 + em;
+
+    if (isNaN(startMins) || isNaN(endMins) || startMins >= endMins) return [];
 
     // Convert appointments to sorted list of {start, duration}
     const booked = appointments
+        .filter(a => a.appointment_time)
         .map(a => {
             const [h, m] = a.appointment_time.split(':').map(Number);
             return {
@@ -44,33 +47,20 @@ const generateDynamicSlots = (startTime: string, endTime: string, appointments: 
         })
         .sort((a, b) => a.start - b.start);
 
-    let current = sh * 60 + sm;
+    // Generate full-hour slots and check the 30-min-minimum rule
+    const slots: string[] = [];
+    for (let mins = startMins; mins < endMins; mins += 60) {
+        const timeStr = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
-    while (current < endMins) {
-        // If current time is inside or exactly at the start of a booked slot
-        const overlap = booked.find(b => current >= b.start && current < b.start + b.duration);
+        // Check: is the 30-min window [mins, mins+30) free of any appointments?
+        const hasConflict = booked.some(b => {
+            const bEnd = b.start + b.duration;
+            // Appointment overlaps with [mins, mins+30) if it starts before mins+30 AND ends after mins
+            return b.start < mins + 30 && bEnd > mins;
+        });
 
-        if (overlap) {
-            // Jump to 60 minutes after the start of this appointment
-            current = overlap.start + 60;
-        } else {
-            // Check if there's any appointment between current and current + 60
-            const nextApt = booked.find(b => b.start > current && b.start < current + 60);
-
-            if (nextApt) {
-                // If there's an appointment soon, still add current slot
-                // but next one will jump to 60m after nextApt start
-                const h = Math.floor(current / 60);
-                const m = current % 60;
-                slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-                current = nextApt.start + 60;
-            } else {
-                // Normal 60m jump
-                const h = Math.floor(current / 60);
-                const m = current % 60;
-                slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-                current += 60;
-            }
+        if (!hasConflict) {
+            slots.push(timeStr);
         }
     }
 

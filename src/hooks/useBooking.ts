@@ -131,6 +131,8 @@ export const useBooking = () => {
     const monthName = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long' });
 
     // Generate dynamic slots with 1-hour windows, including booked appointment times
+    // Rule: A full-hour slot is only "available" if at least 30 min of free time exists
+    // from that hour. If a booking starts < 30 min after a full hour, that hour is blocked.
     const generateDynamicSlots = useCallback((startTime: string, endTime: string, appointments: any[]): string[] => {
         if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
 
@@ -153,29 +155,28 @@ export const useBooking = () => {
             })
             .sort((a, b) => a.start - b.start);
 
-        // Collect booked times (within business hours)
-        const bookedTimes = new Set(booked.filter(b => b.start >= startMins && b.start < endMins).map(b => b.time));
+        // Collect booked times (within business hours) for display
+        const bookedTimes = new Set(
+            booked.filter(b => b.start >= startMins && b.start < endMins).map(b => b.time)
+        );
 
-        // Generate available slots (same logic as before, but skipping booked windows)
+        // Generate full-hour slots and check the 30-min-minimum rule
         const availableSlots: string[] = [];
-        let current = startMins;
-        const maxIterations = 50;
-        let iterations = 0;
+        for (let mins = startMins; mins < endMins; mins += 60) {
+            const timeStr = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
-        while (current < endMins && iterations < maxIterations) {
-            iterations++;
-            const timeStr = `${String(Math.floor(current / 60)).padStart(2, '0')}:${String(current % 60).padStart(2, '0')}`;
+            // Skip if this time is itself a booked appointment
+            if (bookedTimes.has(timeStr)) continue;
 
-            const overlap = booked.find(b => current >= b.start && current < b.start + b.duration);
+            // Check: is the 30-min window [mins, mins+30) free of any appointments?
+            const hasConflict = booked.some(b => {
+                const bEnd = b.start + b.duration;
+                // Appointment overlaps with [mins, mins+30) if it starts before mins+30 AND ends after mins
+                return b.start < mins + 30 && bEnd > mins;
+            });
 
-            if (overlap) {
-                const nextPos = overlap.start + Math.max(overlap.duration, 60);
-                current = nextPos > current ? nextPos : current + 60;
-            } else {
-                if (!bookedTimes.has(timeStr)) {
-                    availableSlots.push(timeStr);
-                }
-                current += 60;
+            if (!hasConflict) {
+                availableSlots.push(timeStr);
             }
         }
 
