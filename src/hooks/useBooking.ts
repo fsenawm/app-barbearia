@@ -130,24 +130,52 @@ export const useBooking = () => {
 
     const monthName = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long' });
 
-    // Generate time slots from start to end at 30-min intervals
-    const generateTimesForDay = (startTime: string, endTime: string): string[] => {
+    // Generate dynamic slots with 1-hour windows shifted by existing appointments
+    const generateDynamicSlots = (startTime: string, endTime: string, appointments: any[]): string[] => {
         if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
+
         const slots: string[] = [];
         const [sh, sm] = startTime.split(':').map(Number);
         const [eh, em] = endTime.split(':').map(Number);
+        const endMins = eh * 60 + em;
+
+        const booked = appointments
+            .map(a => {
+                const [h, m] = a.appointment_time.split(':').map(Number);
+                return {
+                    start: h * 60 + m,
+                    duration: parseDuration(a.serviceDuration)
+                };
+            })
+            .sort((a, b) => a.start - b.start);
+
         let current = sh * 60 + sm;
-        const end = eh * 60 + em;
-        while (current < end) {
-            const h = Math.floor(current / 60);
-            const m = current % 60;
-            slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-            current += 30;
+
+        while (current < endMins) {
+            const overlap = booked.find(b => current >= b.start && current < b.start + b.duration);
+
+            if (overlap) {
+                current = overlap.start + 60;
+            } else {
+                const nextApt = booked.find(b => b.start > current && b.start < current + 60);
+                if (nextApt) {
+                    const h = Math.floor(current / 60);
+                    const m = current % 60;
+                    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                    current = nextApt.start + 60;
+                } else {
+                    const h = Math.floor(current / 60);
+                    const m = current % 60;
+                    slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                    current += 60;
+                }
+            }
         }
+
         return slots;
     };
 
-    // Parse duration string like "30 min", "45 min", "1h", "30" into minutes
+    // Parse duration string
     const parseDuration = (dur: string): number => {
         if (!dur) return 30;
         const cleaned = dur.toLowerCase().replace(/\s/g, '');
@@ -173,12 +201,7 @@ export const useBooking = () => {
 
         for (const apt of appointments) {
             const startTime = apt.appointment_time;
-            const duration = parseDuration(apt.serviceDuration);
-            const slotsNeeded = Math.ceil(duration / 30);
-
-            const startIdx = dayTimes.indexOf(startTime);
-            if (startIdx === -1) continue;
-
+            // Even if we suggest 60m, we mark status based on real duration
             map[startTime] = {
                 status: 'booked',
                 clientName: apt.clientName,
@@ -186,19 +209,8 @@ export const useBooking = () => {
                 serviceDuration: apt.serviceDuration,
             };
 
-            for (let j = 1; j < slotsNeeded; j++) {
-                const invadedIdx = startIdx + j;
-                if (invadedIdx < dayTimes.length) {
-                    const invadedTime = dayTimes[invadedIdx];
-                    if (map[invadedTime]?.status === 'booked') continue;
-                    map[invadedTime] = {
-                        status: 'invaded',
-                        clientName: apt.clientName,
-                        serviceName: apt.serviceName,
-                        bookedByTime: startTime,
-                    };
-                }
-            }
+            // Mark potential conflicts in the map
+            // Note: Since manual overrides are allowed, this map helps visualization
         }
         return map;
     }, []);
@@ -209,14 +221,12 @@ export const useBooking = () => {
         const dayOfWeek = date.getDay();
 
         try {
-            // Fetch all config + blocks + appointments in parallel
             const [allConfigs, blocks, existing] = await Promise.all([
                 scheduleStorage.getConfig(),
                 scheduleStorage.getBlocks(),
                 appointmentsStorage.getByDate(dateStr),
             ]);
 
-            // Check if day is blocked
             const block = blocks.find(b => b.block_date === dateStr);
             if (block) {
                 setTimes([]);
@@ -226,11 +236,11 @@ export const useBooking = () => {
             }
             setBlockReason(null);
 
-            // Find the config for this specific day of the week
             const dayConfig = allConfigs.find(c => c.day_index === dayOfWeek);
             let dayTimes: string[] = [];
             if (dayConfig && dayConfig.is_open) {
-                dayTimes = generateTimesForDay(dayConfig.start_time, dayConfig.end_time);
+                // Use dynamic slot generation
+                dayTimes = generateDynamicSlots(dayConfig.start_time, dayConfig.end_time, existing);
             }
             setTimes(dayTimes);
 
@@ -357,7 +367,7 @@ export const useBooking = () => {
         isPastDay,
         isSelected,
         hasAvailableSlots: times.some(t => slotMap[t]?.status === 'available'),
-        isValidSelection: !!selectedClient && !!selectedService && !!selectedTime && (slotMap[selectedTime]?.status === 'available'),
+        isValidSelection: !!selectedClient && !!selectedService && !!selectedTime,
         blockReason,
     };
 };

@@ -38,3 +38,9 @@ playwright-report/
 
 # Temporários
 *.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Pasta de habilidades do Stitch (apenas local)
+stitch-skills/
+
+.vercel

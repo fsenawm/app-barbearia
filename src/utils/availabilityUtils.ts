@@ -9,22 +9,6 @@ export interface DayAvailability {
     slots: string[];
 }
 
-const generateTimesForDay = (startTime: string, endTime: string): string[] => {
-    if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
-    const slots: string[] = [];
-    const [sh, sm] = startTime.split(':').map(Number);
-    const [eh, em] = endTime.split(':').map(Number);
-    let current = sh * 60 + sm;
-    const end = eh * 60 + em;
-    while (current < end) {
-        const h = Math.floor(current / 60);
-        const m = current % 60;
-        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-        current += 30;
-    }
-    return slots;
-};
-
 const parseDuration = (dur: string): number => {
     if (!dur) return 30;
     const cleaned = dur.toLowerCase().replace(/\s/g, '');
@@ -39,6 +23,58 @@ const parseDuration = (dur: string): number => {
         else mins = 30;
     }
     return mins;
+};
+
+const generateDynamicSlots = (startTime: string, endTime: string, appointments: any[]): string[] => {
+    if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
+
+    const slots: string[] = [];
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const endMins = eh * 60 + em;
+
+    // Convert appointments to sorted list of {start, duration}
+    const booked = appointments
+        .map(a => {
+            const [h, m] = a.appointment_time.split(':').map(Number);
+            return {
+                start: h * 60 + m,
+                duration: parseDuration(a.serviceDuration)
+            };
+        })
+        .sort((a, b) => a.start - b.start);
+
+    let current = sh * 60 + sm;
+
+    while (current < endMins) {
+        // If current time is inside or exactly at the start of a booked slot
+        const overlap = booked.find(b => current >= b.start && current < b.start + b.duration);
+
+        if (overlap) {
+            // Jump to 60 minutes after the start of this appointment
+            current = overlap.start + 60;
+        } else {
+            // Check if there's any appointment between current and current + 60
+            const nextApt = booked.find(b => b.start > current && b.start < current + 60);
+
+            if (nextApt) {
+                // If there's an appointment soon, still add current slot
+                // but next one will jump to 60m after nextApt start
+                const h = Math.floor(current / 60);
+                const m = current % 60;
+                slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                current = nextApt.start + 60;
+            } else {
+                // Normal 60m jump
+                const h = Math.floor(current / 60);
+                const m = current % 60;
+                slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                current += 60;
+            }
+        }
+    }
+
+    return slots;
 };
 
 export const getAvailabilityForDate = async (targetDate: Date): Promise<DayAvailability> => {
@@ -58,44 +94,27 @@ export const getAvailabilityForDate = async (targetDate: Date): Promise<DayAvail
         return { date: d, dateStr, dayName, isClosed: true, slots: [] };
     }
 
-    const allTimes = generateTimesForDay(config.start_time, config.end_time);
     const appts = await appointmentsStorage.getByDate(dateStr);
-
-    const occupied = new Set<string>();
-    for (const apt of appts) {
-        const start = apt.appointment_time;
-        const dur = parseDuration(apt.serviceDuration);
-        const slotsCount = Math.ceil(dur / 30);
-        const startIdx = allTimes.indexOf(start);
-        if (startIdx !== -1) {
-            for (let j = 0; j < slotsCount; j++) {
-                if (startIdx + j < allTimes.length) {
-                    occupied.add(allTimes[startIdx + j]);
-                }
-            }
-        }
-    }
-
-    let freeSlots = allTimes.filter(t => !occupied.has(t));
+    const freeSlots = generateDynamicSlots(config.start_time, config.end_time, appts);
 
     // Filter past times if today
+    let finalSlots = freeSlots;
     const today = new Date();
     if (formatDateLocal(d) === formatDateLocal(today)) {
         const nowMins = today.getHours() * 60 + today.getMinutes();
-        freeSlots = freeSlots.filter(t => {
+        finalSlots = freeSlots.filter(t => {
             const [h, m] = t.split(':').map(Number);
-            return (h * 60 + m) > nowMins + 15;
+            return (h * 60 + m) > nowMins + 5; // Reduced buffer to 5 mins for manual flexibility
         });
     }
 
-    return { date: d, dateStr, dayName, isClosed: freeSlots.length === 0, slots: freeSlots };
+    return { date: d, dateStr, dayName, isClosed: finalSlots.length === 0, slots: finalSlots };
 };
 
 export const getAvailabilityForRange = async (daysCount: number): Promise<DayAvailability[]> => {
     const today = new Date();
     const result: DayAvailability[] = [];
 
-    // Cache config and blocks
     const [configs, blocks] = await Promise.all([
         scheduleStorage.getConfig(),
         scheduleStorage.getBlocks()
@@ -120,35 +139,16 @@ export const getAvailabilityForRange = async (daysCount: number): Promise<DayAva
             continue;
         }
 
-        const allTimes = generateTimesForDay(config.start_time, config.end_time);
         const appts = await appointmentsStorage.getByDate(dateStr);
+        const freeSlots = generateDynamicSlots(config.start_time, config.end_time, appts);
 
-        // Map occupied slots
-        const occupied = new Set<string>();
-        for (const apt of appts) {
-            const start = apt.appointment_time;
-            const dur = parseDuration(apt.serviceDuration);
-            const slotsCount = Math.ceil(dur / 30);
-            const startIdx = allTimes.indexOf(start);
-            if (startIdx !== -1) {
-                for (let j = 0; j < slotsCount; j++) {
-                    if (startIdx + j < allTimes.length) {
-                        occupied.add(allTimes[startIdx + j]);
-                    }
-                }
-            }
-        }
-
-        const freeSlots = allTimes.filter(t => !occupied.has(t));
-
-        // If it's today, filter out past times
         let finalSlots = freeSlots;
         if (i === 0) {
             const now = new Date();
             const nowMins = now.getHours() * 60 + now.getMinutes();
             finalSlots = freeSlots.filter(t => {
                 const [h, m] = t.split(':').map(Number);
-                return (h * 60 + m) > nowMins + 15; // Give 15 mins buffer
+                return (h * 60 + m) > nowMins + 5;
             });
         }
 

@@ -259,78 +259,95 @@ const Booking: React.FC<BookingProps> = ({ onNavigate }) => {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-1.5">
-                            {times.map((time) => {
-                                const info = slotMap[time] || { status: 'available' as const };
-                                const isBooked = info.status === 'booked';
-                                const isInvaded = info.status === 'invaded';
-                                const isDisabled = isBooked || isInvaded;
-                                const isSelectedTime = selectedTime === time;
+                        <>
+                            {/* Manual Time Input */}
+                            <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-sm font-bold text-slate-500 dark:text-slate-400">Horário Escolhido</label>
+                                    <span className="text-xs font-medium text-primary">Ajuste se necessário</span>
+                                </div>
+                                <input
+                                    type="time"
+                                    value={selectedTime}
+                                    onChange={(e) => setSelectedTime(e.target.value)}
+                                    className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-lg font-bold text-center focus:ring-2 focus:ring-primary outline-none transition-all"
+                                />
+                            </div>
 
-                                return (
-                                    <button
-                                        key={time}
-                                        onClick={() => !isDisabled && setSelectedTime(time)}
-                                        disabled={isDisabled}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${isBooked
-                                            ? 'border-primary/30 bg-primary/5 cursor-not-allowed'
-                                            : isInvaded
-                                                ? 'border-dashed border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/20 cursor-not-allowed'
-                                                : isSelectedTime
-                                                    ? 'border-primary bg-primary/10 shadow-md shadow-primary/10'
-                                                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-primary/50'
-                                            }`}
-                                    >
-                                        {/* Time label */}
-                                        <span className={`text-sm font-bold w-12 shrink-0 ${isBooked ? 'text-primary/60'
-                                            : isInvaded ? 'text-orange-400 dark:text-orange-500'
-                                                : isSelectedTime ? 'text-primary'
-                                                    : 'text-slate-700 dark:text-slate-200'
-                                            }`}>
-                                            {time}
-                                        </span>
+                            <div className="space-y-1.5">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Sugestões de Horários</h3>
+                                {times.map((time) => {
+                                    const info = slotMap[time] || { status: 'available' as const };
+                                    const isBooked = info.status === 'booked';
+                                    const isInvaded = info.status === 'invaded';
+                                    const isDisabled = isBooked || isInvaded;
+                                    const isSelectedTime = selectedTime === time;
 
-                                        {/* Status content */}
-                                        <div className="flex-1 min-w-0">
-                                            {isBooked && (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-primary/60 text-base" translate="no">person</span>
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{info.clientName}</p>
-                                                        <p className="text-[10px] text-slate-400 truncate">{info.serviceName} • {info.serviceDuration}</p>
+                                    return (
+                                        <button
+                                            key={time}
+                                            onClick={() => !isDisabled && setSelectedTime(time)}
+                                            disabled={isDisabled}
+                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-left transition-all ${isBooked
+                                                ? 'border-primary/30 bg-primary/5 cursor-not-allowed'
+                                                : isInvaded
+                                                    ? 'border-dashed border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/20 cursor-not-allowed'
+                                                    : isSelectedTime
+                                                        ? 'border-primary bg-primary/10 shadow-md shadow-primary/10'
+                                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-primary/50'
+                                                }`}
+                                        >
+                                            {/* Time label */}
+                                            <span className={`text-sm font-bold w-12 shrink-0 ${isBooked ? 'text-primary/60'
+                                                : isInvaded ? 'text-orange-400 dark:text-orange-500'
+                                                    : isSelectedTime ? 'text-primary'
+                                                        : 'text-slate-700 dark:text-slate-200'
+                                                }`}>
+                                                {time}
+                                            </span>
+
+                                            {/* Status content */}
+                                            <div className="flex-1 min-w-0">
+                                                {isBooked && (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-primary/60 text-base" translate="no">person</span>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{info.clientName}</p>
+                                                            <p className="text-[10px] text-slate-400 truncate">{info.serviceName} • {info.serviceDuration}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
+                                                {isInvaded && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-orange-400 text-sm" translate="no">arrow_back</span>
+                                                        <span className="text-[11px] font-semibold text-orange-500 dark:text-orange-400 truncate">
+                                                            {info.bookedByTime} — {info.serviceName}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {!isDisabled && !isSelectedTime && (
+                                                    <span className="text-xs text-slate-400 font-medium">Disponível</span>
+                                                )}
+                                                {!isDisabled && isSelectedTime && (
+                                                    <span className="text-xs text-primary font-bold flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-sm" translate="no">check_circle</span>
+                                                        Selecionado
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Right indicator */}
+                                            {isBooked && (
+                                                <span className="material-symbols-outlined text-primary/40 text-lg shrink-0" translate="no">lock</span>
                                             )}
                                             {isInvaded && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="material-symbols-outlined text-orange-400 text-sm" translate="no">arrow_back</span>
-                                                    <span className="text-[11px] font-semibold text-orange-500 dark:text-orange-400 truncate">
-                                                        {info.bookedByTime} — {info.serviceName}
-                                                    </span>
-                                                </div>
+                                                <span className="material-symbols-outlined text-orange-300 text-lg shrink-0" translate="no">block</span>
                                             )}
-                                            {!isDisabled && !isSelectedTime && (
-                                                <span className="text-xs text-slate-400 font-medium">Disponível</span>
-                                            )}
-                                            {!isDisabled && isSelectedTime && (
-                                                <span className="text-xs text-primary font-bold flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-sm" translate="no">check_circle</span>
-                                                    Selecionado
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Right indicator */}
-                                        {isBooked && (
-                                            <span className="material-symbols-outlined text-primary/40 text-lg shrink-0" translate="no">lock</span>
-                                        )}
-                                        {isInvaded && (
-                                            <span className="material-symbols-outlined text-orange-300 text-lg shrink-0" translate="no">block</span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </section>
 
@@ -377,7 +394,7 @@ const Booking: React.FC<BookingProps> = ({ onNavigate }) => {
                     )}
                 </button>
             </footer>
-        </div>
+        </div >
     );
 };
 

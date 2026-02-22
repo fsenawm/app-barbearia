@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm test:*)",
-      "Bash(npx playwright install:*)"
+      "Bash(npx playwright install:*)",
+      "Bash(git push:*)",
+      "Bash(vercel:*)"
     ]
   }
 }

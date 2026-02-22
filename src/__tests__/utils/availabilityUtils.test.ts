@@ -16,13 +16,13 @@ vi.mock('../../utils/storage', () => ({
 import { scheduleStorage, appointmentsStorage } from '../../utils/storage'
 
 const mockConfig = [
-    { id: '0', day_index: 0, day_name: 'Domingo',        is_open: false, start_time: '--:--', end_time: '--:--' },
-    { id: '1', day_index: 1, day_name: 'Segunda-feira',  is_open: true,  start_time: '09:00', end_time: '12:00' },
-    { id: '2', day_index: 2, day_name: 'Terça-feira',    is_open: true,  start_time: '09:00', end_time: '12:00' },
-    { id: '3', day_index: 3, day_name: 'Quarta-feira',   is_open: true,  start_time: '09:00', end_time: '12:00' },
-    { id: '4', day_index: 4, day_name: 'Quinta-feira',   is_open: true,  start_time: '09:00', end_time: '12:00' },
-    { id: '5', day_index: 5, day_name: 'Sexta-feira',    is_open: true,  start_time: '09:00', end_time: '12:00' },
-    { id: '6', day_index: 6, day_name: 'Sábado',         is_open: true,  start_time: '09:00', end_time: '12:00' },
+    { id: '0', day_index: 0, day_name: 'Domingo', is_open: false, start_time: '--:--', end_time: '--:--' },
+    { id: '1', day_index: 1, day_name: 'Segunda-feira', is_open: true, start_time: '09:00', end_time: '12:00' },
+    { id: '2', day_index: 2, day_name: 'Terça-feira', is_open: true, start_time: '09:00', end_time: '12:00' },
+    { id: '3', day_index: 3, day_name: 'Quarta-feira', is_open: true, start_time: '09:00', end_time: '12:00' },
+    { id: '4', day_index: 4, day_name: 'Quinta-feira', is_open: true, start_time: '09:00', end_time: '12:00' },
+    { id: '5', day_index: 5, day_name: 'Sexta-feira', is_open: true, start_time: '09:00', end_time: '12:00' },
+    { id: '6', day_index: 6, day_name: 'Sábado', is_open: true, start_time: '09:00', end_time: '12:00' },
 ]
 
 // Fixa em uma segunda-feira 09:00
@@ -56,14 +56,14 @@ describe('getAvailabilityForRange', () => {
         expect(sunday!.slots).toHaveLength(0)
     })
 
-    it('dia aberto gera slots a cada 30 minutos', async () => {
-        // 09:00 – 12:00 = 6 slots: 09:00, 09:30, 10:00, 10:30, 11:00, 11:30
+    it('dia aberto gera slots a cada 1 hora', async () => {
+        // 09:00 – 12:00 = 3 slots: 09:00, 10:00, 11:00
         const result = await getAvailabilityForRange(2)
         // result[0] é hoje (segunda); slots futuros após agora+15min (09:15)
-        // 09:00 e 09:15 já passaram → restam: 09:30, 10:00, 10:30, 11:00, 11:30
+        // 09:00 já passou → restam: 10:00, 11:00
         const tomorrow = result[1]
         expect(tomorrow.isClosed).toBe(false)
-        expect(tomorrow.slots).toEqual(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30'])
+        expect(tomorrow.slots).toEqual(['09:00', '10:00', '11:00'])
     })
 
     it('dia bloqueado tem isClosed=true', async () => {
@@ -99,7 +99,7 @@ describe('getAvailabilityForRange', () => {
         const result = await getAvailabilityForRange(2)
         const tuesday = result.find(d => d.dateStr === '2025-01-07')
         expect(tuesday!.slots).not.toContain('09:00')
-        expect(tuesday!.slots).toContain('09:30')
+        expect(tuesday!.slots).toContain('10:00')
     })
 
     it('slots ocupados são removidos (duração 1h = 2 slots)', async () => {
@@ -125,16 +125,15 @@ describe('getAvailabilityForRange', () => {
         const result = await getAvailabilityForRange(2)
         const tuesday = result.find(d => d.dateStr === '2025-01-07')
         expect(tuesday!.slots).not.toContain('09:00')
-        expect(tuesday!.slots).not.toContain('09:30')
         expect(tuesday!.slots).toContain('10:00')
     })
 
     it('hoje filtra slots que já passaram (+ 15min de buffer)', async () => {
-        // Agora = 09:00 → buffer = 09:15 → remove 09:00, mantém 09:30+
+        // Agora = 09:00 → buffer = 09:15 → remove 09:00, mantém 10:00+
         const result = await getAvailabilityForRange(1)
         const today = result[0]
         expect(today.slots).not.toContain('09:00')
-        expect(today.slots).toContain('09:30')
+        expect(today.slots).toContain('10:00')
     })
 
     it('retorna dateStr formatado como YYYY-MM-DD', async () => {

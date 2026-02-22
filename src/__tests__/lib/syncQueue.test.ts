@@ -8,6 +8,7 @@ const { mockSyncQueueTable, mockLocalDb, mockSupabaseFrom } = vi.hoisted(() => {
         orderBy: vi.fn(),
         count: vi.fn(),
         delete: vi.fn(),
+        update: vi.fn(),
     }
     const mockLocalDb = {
         sync_queue: mockSyncQueueTable,

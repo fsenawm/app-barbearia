@@ -1,41 +1,56 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mocks via vi.hoisted ──────────────────────────────────
-
-const { mockLocalDb, mockIsOnline, mockEnqueue, mockSupabaseFrom } = vi.hoisted(() => {
-    // Chainable helper
+// ── Mocks via vi.hoisted (hoisted before imports) ─────────
+const { mockLocalDb, mockIsOnline, mockEnqueue, mockSupabaseFrom, mockGetSession } = vi.hoisted(() => {
     const chainable = (data: unknown[]) => ({ toArray: vi.fn().mockResolvedValue(data) })
 
-    const mockLocalDb = {
-        clients: {
-            orderBy: vi.fn().mockReturnValue(chainable([])),
-            get: vi.fn(),
-            put: vi.fn().mockResolvedValue(undefined),
-            update: vi.fn().mockResolvedValue(1),
-            delete: vi.fn().mockResolvedValue(undefined),
+    return {
+        mockLocalDb: {
+            clients: {
+                orderBy: vi.fn().mockReturnValue(chainable([])),
+                get: vi.fn(),
+                put: vi.fn().mockResolvedValue(undefined),
+                update: vi.fn().mockResolvedValue(1),
+                delete: vi.fn().mockResolvedValue(undefined),
+            },
+            services: {
+                orderBy: vi.fn().mockReturnValue(chainable([])),
+                put: vi.fn().mockResolvedValue(undefined),
+                update: vi.fn().mockResolvedValue(1),
+                delete: vi.fn().mockResolvedValue(undefined),
+            },
+            appointments: {
+                put: vi.fn().mockResolvedValue(undefined),
+                where: vi.fn(),
+                delete: vi.fn().mockResolvedValue(undefined),
+                update: vi.fn().mockResolvedValue(1),
+            },
+            schedule_config: {
+                orderBy: vi.fn().mockReturnValue(chainable([])),
+                bulkPut: vi.fn().mockResolvedValue(undefined),
+                where: vi.fn(),
+            },
+            schedule_blocks: {
+                orderBy: vi.fn().mockReturnValue(chainable([])),
+                put: vi.fn().mockResolvedValue(undefined),
+                delete: vi.fn().mockResolvedValue(undefined),
+            }
         },
-        services: {
-            orderBy: vi.fn().mockReturnValue(chainable([])),
-            put: vi.fn().mockResolvedValue(undefined),
-            update: vi.fn().mockResolvedValue(1),
-            delete: vi.fn().mockResolvedValue(undefined),
-        },
-        appointments: {
-            put: vi.fn().mockResolvedValue(undefined),
-            where: vi.fn(),
-            delete: vi.fn().mockResolvedValue(undefined),
-            update: vi.fn().mockResolvedValue(1),
-        },
+        mockIsOnline: vi.fn().mockReturnValue(false),
+        mockEnqueue: vi.fn().mockResolvedValue(undefined),
+        mockSupabaseFrom: vi.fn(),
+        mockGetSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'test-user-id' } } } })
     }
-    const mockIsOnline = vi.fn().mockReturnValue(false)
-    const mockEnqueue = vi.fn().mockResolvedValue(undefined)
-    const mockSupabaseFrom = vi.fn()
-    return { mockLocalDb, mockIsOnline, mockEnqueue, mockSupabaseFrom }
 })
 
 vi.mock('../../lib/localDb', () => ({ localDb: mockLocalDb }))
 vi.mock('../../lib/syncQueue', () => ({ isOnline: mockIsOnline, enqueue: mockEnqueue }))
-vi.mock('../../lib/supabase', () => ({ supabase: { from: mockSupabaseFrom } }))
+vi.mock('../../lib/supabase', () => ({
+    supabase: {
+        from: mockSupabaseFrom,
+        auth: { getSession: mockGetSession }
+    }
+}))
 
 import { clientsStorage, servicesStorage, appointmentsStorage } from '../../utils/storage'
 
