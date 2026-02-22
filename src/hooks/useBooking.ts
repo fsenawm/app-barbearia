@@ -130,11 +130,10 @@ export const useBooking = () => {
 
     const monthName = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long' });
 
-    // Generate dynamic slots with 1-hour windows shifted by existing appointments
+    // Generate dynamic slots with 1-hour windows, including booked appointment times
     const generateDynamicSlots = useCallback((startTime: string, endTime: string, appointments: any[]): string[] => {
         if (!startTime || !endTime || startTime === '--:--' || endTime === '--:--') return [];
 
-        const slots: string[] = [];
         const [sh, sm] = startTime.split(':').map(Number);
         const [eh, em] = endTime.split(':').map(Number);
         const startMins = sh * 60 + sm;
@@ -148,34 +147,47 @@ export const useBooking = () => {
                 const [h, m] = a.appointment_time.split(':').map(Number);
                 return {
                     start: h * 60 + m,
+                    time: a.appointment_time,
                     duration: parseDuration(a.serviceDuration)
                 };
             })
             .sort((a, b) => a.start - b.start);
 
+        // Collect booked times (within business hours)
+        const bookedTimes = new Set(booked.filter(b => b.start >= startMins && b.start < endMins).map(b => b.time));
+
+        // Generate available slots (same logic as before, but skipping booked windows)
+        const availableSlots: string[] = [];
         let current = startMins;
-        const maxIterations = 50; // Safety guard against infinite loops
+        const maxIterations = 50;
         let iterations = 0;
 
         while (current < endMins && iterations < maxIterations) {
             iterations++;
             const timeStr = `${String(Math.floor(current / 60)).padStart(2, '0')}:${String(current % 60).padStart(2, '0')}`;
 
-            // Check if current slot overlaps with any booked appointment
             const overlap = booked.find(b => current >= b.start && current < b.start + b.duration);
 
             if (overlap) {
-                // Skip past the overlapping appointment by at least 60 min from its start
                 const nextPos = overlap.start + Math.max(overlap.duration, 60);
                 current = nextPos > current ? nextPos : current + 60;
             } else {
-                // Slot is available, add it
-                slots.push(timeStr);
+                if (!bookedTimes.has(timeStr)) {
+                    availableSlots.push(timeStr);
+                }
                 current += 60;
             }
         }
 
-        return slots;
+        // Merge booked + available and sort chronologically
+        const allSlots = [...new Set([...bookedTimes, ...availableSlots])];
+        allSlots.sort((a, b) => {
+            const [ah, am] = a.split(':').map(Number);
+            const [bh, bm] = b.split(':').map(Number);
+            return (ah * 60 + am) - (bh * 60 + bm);
+        });
+
+        return allSlots;
     }, []);
 
     // Parse duration string
