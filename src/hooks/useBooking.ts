@@ -340,7 +340,9 @@ export const useBooking = () => {
             const phoneWithCountry = phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`;
             const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodedMessage}`;
 
-            window.open(whatsappUrl, '_blank');
+            // Use location.href instead of window.open to avoid iOS Safari pop-up blocker
+            // (window.open is blocked in async contexts where the user-gesture chain is broken)
+            window.location.href = whatsappUrl;
 
             setIsSaved(true);
         } catch (error) {
