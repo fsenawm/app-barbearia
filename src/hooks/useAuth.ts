@@ -62,6 +62,16 @@ export const useAuth = () => {
         return 'ok';
     };
 
+    const resetPassword = async (email: string): Promise<boolean> => {
+        setError(null);
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) {
+            setError(translateError(error.message));
+            return false;
+        }
+        return true;
+    };
+
     const signOut = async () => {
         await supabase.auth.signOut();
         await Promise.all([
@@ -74,5 +84,5 @@ export const useAuth = () => {
         ]);
     };
 
-    return { user, loading, error, signIn, signUp, signOut };
+    return { user, loading, error, signIn, signUp, signOut, resetPassword };
 };
