@@ -206,9 +206,9 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                                                         onClick={() => handleToggleStatus(apt.id, false)}
                                                         className="flex items-center justify-center gap-1 text-[10px] font-bold px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-orange-100 hover:text-orange-500 transition-colors"
                                                     >
-                                                        {apt.payment_method ? apt.payment_method : 'Confirmado'}
+                                                        {apt.payment_method ? apt.payment_method.charAt(0).toUpperCase() + apt.payment_method.slice(1) : 'Confirmado'}
                                                         <span className="material-symbols-outlined text-[14px]">
-                                                            {apt.payment_method === 'Pix' ? 'pix' : apt.payment_method === 'Dinheiro' ? 'payments' : apt.payment_method === 'Cartão' ? 'credit_card' : 'check_circle'}
+                                                            {apt.payment_method === 'pix' ? 'pix' : apt.payment_method === 'dinheiro' ? 'payments' : apt.payment_method === 'cartao' ? 'credit_card' : 'check_circle'}
                                                         </span>
                                                     </button>
                                                 ) : (
@@ -271,20 +271,29 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                                 <span className="material-symbols-outlined text-green-500 text-2xl">payments</span>
                                 <span className="font-bold">Dinheiro</span>
                             </button>
-                            <button
-                                onClick={() => handleConfirmPayment('Pix')}
-                                className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 transition-all text-left"
-                            >
-                                <span className="material-symbols-outlined text-teal-500 text-2xl">pix</span>
-                                <span className="font-bold">Pix</span>
-                            </button>
-                            <button
-                                onClick={() => handleConfirmPayment('Cartão')}
-                                className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 transition-all text-left"
-                            >
-                                <span className="material-symbols-outlined text-blue-500 text-2xl">credit_card</span>
-                                <span className="font-bold">Cartão</span>
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleConfirmPayment('dinheiro')}
+                                    className="flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-green-600 dark:text-green-400 mb-1">payments</span>
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Dinheiro</span>
+                                </button>
+                                <button
+                                    onClick={() => handleConfirmPayment('pix')}
+                                    className="flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-teal-600 dark:text-teal-400 mb-1">pix</span>
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Pix</span>
+                                </button>
+                                <button
+                                    onClick={() => handleConfirmPayment('cartao')}
+                                    className="flex-1 flex flex-col items-center justify-center p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 mb-1">credit_card</span>
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Cartão</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
