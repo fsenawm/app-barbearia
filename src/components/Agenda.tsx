@@ -37,7 +37,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
             const { appointmentsStorage } = await import('../utils/storage');
             await appointmentsStorage.updatePaymentMethod(selectedAptId, method);
             
-            if (method === 'Pix') {
+            if (method === 'pix') {
                 const pixKey = await settingsStorage.getPixKey();
                 const apt = appointments.find(a => a.id === selectedAptId);
                 if (pixKey && apt) {
