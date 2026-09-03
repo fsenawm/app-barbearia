@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useDashboard } from '../hooks/useDashboard';
 import { getAvailabilityForRange, getAvailabilityForDate, DayAvailability } from '../utils/availabilityUtils';
 import { formatDateLocal } from '../utils/dateUtils';
-import { clientsStorage, appointmentsStorage, settingsStorage, Client } from '../utils/storage';
+import { clientsStorage, appointmentsStorage, Client } from '../utils/storage';
 
 interface DashboardProps {
     readonly onNavigate?: (screen: string) => void;
@@ -26,10 +26,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const [shareDayData, setShareDayData] = useState<DayAvailability | null>(null);
     const [selectedShareSlots, setSelectedShareSlots] = useState<string[]>([]);
 
-    // Settings Modal
-    const [showSettingsModal, setShowSettingsModal] = useState(false);
-    const [pixKey, setPixKey] = useState('');
-    const [isSavingSettings, setIsSavingSettings] = useState(false);
+
 
     // Generate next 14 days for date picker
     const datePickerDays = useMemo(() => {
@@ -150,24 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         }
     };
 
-    const handleOpenSettings = async () => {
-        const currentKey = await settingsStorage.getPixKey();
-        setPixKey(currentKey || '');
-        setShowSettingsModal(true);
-    };
-
-    const handleSaveSettings = async () => {
-        setIsSavingSettings(true);
-        try {
-            await settingsStorage.savePixKey(pixKey);
-            setShowSettingsModal(false);
-        } catch {
-            alert('Erro ao salvar as configurações.');
-        } finally {
-            setIsSavingSettings(false);
-        }
-    };
-
+    
     return (
         <>
             {/* Header */}
@@ -717,48 +697,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                             ) : (
                                 <p className="py-10 text-center text-sm text-slate-400 font-medium">Encontre um cliente para compartilhar.</p>
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {/* Settings Modal */}
-            {showSettingsModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                            <h3 className="font-bold text-lg">Configurações</h3>
-                            <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Chave Pix</label>
-                                <input
-                                    type="text"
-                                    value={pixKey}
-                                    onChange={(e) => setPixKey(e.target.value)}
-                                    placeholder="Ex: 11999999999 ou email@email.com"
-                                    className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary"
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">Será enviada aos clientes ao selecionar pagamento via Pix.</p>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-                            <button
-                                onClick={() => setShowSettingsModal(false)}
-                                className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 font-bold text-sm"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveSettings}
-                                disabled={isSavingSettings}
-                                className="px-4 py-2 rounded-xl bg-primary text-white font-bold text-sm disabled:opacity-50"
-                            >
-                                {isSavingSettings ? 'Salvando...' : 'Salvar'}
-                            </button>
                         </div>
                     </div>
                 </div>
