@@ -14,7 +14,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
         monthName, currentYear,
         calendarDays, goToPreviousMonth, goToNextMonth,
         selectDay, isToday, isSelected, handleDelete, handleToggleStatus,
-        blockReason,
+        blockReason, reload
     } = useAgenda();
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -52,8 +52,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
             }
             
             // Reload agenda
-            window.location.reload(); // Simple way to reload or call a refresh method if available
-            // Wait, useAgenda doesn't expose a reload method. We can toggle status to trigger a re-render or let the user refresh.
+            reload();
         } catch {
             alert('Erro ao confirmar pagamento.');
         } finally {
