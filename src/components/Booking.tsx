@@ -93,29 +93,6 @@ const Booking: React.FC<BookingProps> = ({ onNavigate, payload }) => {
             </header>
 
             <main className="flex-1 overflow-y-auto px-4 py-6 space-y-8 pb-40">
-                {/* Section: Serviço (FIRST) */}
-                <section className="space-y-3">
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Serviço</h2>
-                    <div className="grid grid-cols-3 gap-3">
-                        {services.map((service) => (
-                            <button
-                                key={service.id}
-                                onClick={() => setSelectedService(service.id)}
-                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all text-center ${selectedService === service.id
-                                    ? 'border-primary bg-primary/10'
-                                    : 'border-transparent bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600'
-                                    }`}
-                            >
-                                <span className={`material-symbols-outlined mb-2 text-3xl ${selectedService === service.id ? 'text-primary' : 'text-slate-400'}`} translate="no">
-                                    {service.icon}
-                                </span>
-                                <span className="text-sm font-bold">{service.name}</span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">{service.price}</span>
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
                 {/* Section: Cliente (BELOW Service) */}
                 <section className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -351,6 +328,29 @@ const Booking: React.FC<BookingProps> = ({ onNavigate, payload }) => {
                             </div>
                         </>
                     )}
+                </section>
+
+                {/* Section: Serviço (FIRST) */}
+                <section className="space-y-3">
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Serviço</h2>
+                    <div className="grid grid-cols-3 gap-3">
+                        {services.map((service) => (
+                            <button
+                                key={service.id}
+                                onClick={() => setSelectedService(service.id)}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all text-center ${selectedService === service.id
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-transparent bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600'
+                                    }`}
+                            >
+                                <span className={`material-symbols-outlined mb-2 text-3xl ${selectedService === service.id ? 'text-primary' : 'text-slate-400'}`} translate="no">
+                                    {service.icon}
+                                </span>
+                                <span className="text-sm font-bold">{service.name}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">{service.price}</span>
+                            </button>
+                        ))}
+                    </div>
                 </section>
 
                 {/* Section: Configurações */}
