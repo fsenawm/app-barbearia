@@ -257,15 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Enviar Vagas</span>
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 mt-3">
-                        <button
-                            onClick={handleOpenSettings}
-                            className="flex flex-row justify-center items-center gap-3 p-4 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:border-primary active:scale-95 transition-all shadow-sm"
-                        >
-                            <span className="material-symbols-outlined text-slate-500 text-2xl">settings</span>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Configurações</span>
-                        </button>
-                    </div>
+                    
                 </section>
 
                 {/* Performance Chart */}
