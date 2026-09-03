@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { localDb } from '../lib/localDb';
 import { enqueue, isOnline } from '../lib/syncQueue';
+import { formatDateLocal } from './dateUtils';
 
 // ── Interfaces (unchanged) ──
 
@@ -283,7 +284,7 @@ export const appointmentsStorage = {
     },
 
     getUpcoming: async (limit = 10): Promise<AppointmentWithDetails[]> => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatDateLocal(new Date());
         const all = await localDb.appointments
             .where('appointment_date')
             .aboveOrEqual(today)

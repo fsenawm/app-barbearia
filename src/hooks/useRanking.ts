@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { formatDateLocal } from '../utils/dateUtils';
 
 const parsePrice = (price: string): number => {
     if (!price) return 0;
@@ -24,14 +25,14 @@ export const useRanking = () => {
             if (p === 'week') {
                 const weekAgo = new Date(now);
                 weekAgo.setDate(now.getDate() - 7);
-                startDate = weekAgo.toISOString().split('T')[0];
+                startDate = formatDateLocal(weekAgo);
             } else if (p === 'month') {
                 startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
             } else {
                 startDate = `${now.getFullYear()}-01-01`;
             }
 
-            const endDate = now.toISOString().split('T')[0];
+            const endDate = formatDateLocal(now);
 
             const { data, error } = await supabase
                 .from('appointments')
