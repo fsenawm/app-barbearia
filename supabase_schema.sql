@@ -27,6 +27,7 @@ create table appointments (
   appointment_date date not null,
   appointment_time text not null,
   is_confirmed boolean default true,
+  payment_method text,
   created_at timestamptz default now()
 );
 
@@ -56,6 +57,15 @@ alter table services enable row level security;
 alter table appointments enable row level security;
 alter table schedule_config enable row level security;
 alter table schedule_blocks enable row level security;
+
+-- Create Settings Table
+create table settings (
+  id uuid default gen_random_uuid() primary key,
+  pix_key text,
+  updated_at timestamptz default now()
+);
+alter table settings enable row level security;
+create policy "Allow all for anon" on settings for all using (true) with check (true);
 
 create policy "Allow all for anon" on clients for all using (true) with check (true);
 create policy "Allow all for anon" on services for all using (true) with check (true);

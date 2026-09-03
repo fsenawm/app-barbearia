@@ -15,6 +15,12 @@ import OfflineBanner from './components/OfflineBanner'
 function App() {
     const { user, loading, signOut } = useAuth()
     const [currentScreen, setCurrentScreen] = useState('dashboard')
+    const [currentPayload, setCurrentPayload] = useState<any>(null)
+
+    const handleNavigate = (screen: string, payload?: any) => {
+        setCurrentScreen(screen)
+        setCurrentPayload(payload || null)
+    }
 
     if (loading) {
         return (
@@ -35,18 +41,18 @@ function App() {
             <OfflineBanner />
             <Layout
                 currentScreen={currentScreen}
-                onNavigate={setCurrentScreen}
+                onNavigate={handleNavigate}
                 onSignOut={signOut}
                 userName={userName}
             >
-                {currentScreen === 'dashboard' && <Dashboard onNavigate={setCurrentScreen} />}
-                {currentScreen === 'agenda' && <Agenda onNavigate={setCurrentScreen} />}
-                {currentScreen === 'booking' && <Booking onNavigate={setCurrentScreen} />}
-                {currentScreen === 'clientes' && <Clients onNavigate={setCurrentScreen} />}
-                {currentScreen === 'financeiro' && <Financial onNavigate={setCurrentScreen} />}
-                {currentScreen === 'ranking' && <Ranking onNavigate={setCurrentScreen} />}
-                {currentScreen === 'schedules' && <Schedules onNavigate={setCurrentScreen} />}
-                {currentScreen === 'servicos' && <Services onNavigate={setCurrentScreen} />}
+                {currentScreen === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
+                {currentScreen === 'agenda' && <Agenda onNavigate={handleNavigate} />}
+                {currentScreen === 'booking' && <Booking onNavigate={handleNavigate} payload={currentPayload} />}
+                {currentScreen === 'clientes' && <Clients onNavigate={handleNavigate} />}
+                {currentScreen === 'financeiro' && <Financial onNavigate={handleNavigate} />}
+                {currentScreen === 'ranking' && <Ranking onNavigate={handleNavigate} />}
+                {currentScreen === 'schedules' && <Schedules onNavigate={handleNavigate} />}
+                {currentScreen === 'servicos' && <Services onNavigate={handleNavigate} />}
             </Layout>
         </>
     )

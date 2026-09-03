@@ -29,6 +29,7 @@ export interface Appointment {
     appointment_date: string;
     appointment_time: string;
     is_confirmed: boolean;
+    payment_method?: string | null;
 }
 
 export interface AppointmentWithDetails extends Appointment {
@@ -342,6 +343,41 @@ export const appointmentsStorage = {
             await enqueue('appointments', 'update', id, { is_confirmed: confirmed });
         }
     },
+
+    updateAppointment: async (id: string, updates: Partial<Omit<Appointment, 'id'>>) => {
+        await localDb.appointments.update(id, updates);
+
+        if (isOnline()) {
+            try {
+                const { error } = await supabase.from('appointments')
+                    .update(updates).eq('id', id);
+                if (error) throw error;
+            } catch (err) {
+                console.error('[Appointments] Online update failed, queued:', err);
+                await enqueue('appointments', 'update', id, updates);
+            }
+        } else {
+            await enqueue('appointments', 'update', id, updates);
+        }
+    },
+
+    updatePaymentMethod: async (id: string, paymentMethod: string) => {
+        await localDb.appointments.update(id, { payment_method: paymentMethod, is_confirmed: true });
+
+        const payload = { payment_method: paymentMethod, is_confirmed: true };
+        if (isOnline()) {
+            try {
+                const { error } = await supabase.from('appointments')
+                    .update(payload).eq('id', id);
+                if (error) throw error;
+            } catch (err) {
+                console.error('[Appointments] Online update payment failed, queued:', err);
+                await enqueue('appointments', 'update', id, payload);
+            }
+        } else {
+            await enqueue('appointments', 'update', id, payload);
+        }
+    },
 };
 
 // ══════════════════════════════════════════════════════
@@ -484,3 +520,35 @@ export const scheduleStorage = {
         return fallback ? { ...fallback, id: String(dayIndex) } : null;
     },
 };
+
+// ══════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════
+
+export const settingsStorage = {
+    getPixKey: async (): Promise<string | null> => {
+        const local = await localDb.settings.toCollection().first();
+        return local?.pix_key || null;
+    },
+
+    savePixKey: async (pixKey: string) => {
+        const local = await localDb.settings.toCollection().first();
+        const id = local?.id || generateId();
+        const payload = { id, pix_key: pixKey, updated_at: new Date().toISOString() };
+
+        await localDb.settings.put(payload);
+
+        if (isOnline()) {
+            try {
+                const { error } = await supabase.from('settings').upsert(payload, { onConflict: 'id' });
+                if (error) throw error;
+            } catch (err) {
+                console.error('[Settings] Online upsert failed, queued:', err);
+                await enqueue('settings', 'upsert', id, payload);
+            }
+        } else {
+            await enqueue('settings', 'upsert', id, payload);
+        }
+    },
+};
+

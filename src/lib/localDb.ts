@@ -26,6 +26,7 @@ export interface LocalAppointment {
     appointment_date: string;
     appointment_time: string;
     is_confirmed: boolean;
+    payment_method?: string | null;
 }
 
 export interface LocalScheduleConfig {
@@ -41,6 +42,11 @@ export interface LocalScheduleBlock {
     id: string;
     block_date: string;
     reason: string | null;
+}
+
+export interface LocalSettings {
+    id: string;
+    pix_key?: string | null;
 }
 
 export interface SyncQueueItem {
@@ -59,6 +65,7 @@ class BarbeariaDB extends Dexie {
     appointments!: Table<LocalAppointment, string>;
     schedule_config!: Table<LocalScheduleConfig, string>;
     schedule_blocks!: Table<LocalScheduleBlock, string>;
+    settings!: Table<LocalSettings, string>;
     sync_queue!: Table<SyncQueueItem, number>;
 
     constructor() {
@@ -69,6 +76,7 @@ class BarbeariaDB extends Dexie {
             appointments: 'id, client_id, service_id, appointment_date, appointment_time',
             schedule_config: 'id, day_index',
             schedule_blocks: 'id, block_date',
+            settings: 'id',
             sync_queue: '++autoId, table, createdAt',
         });
     }

@@ -2,12 +2,13 @@ import React from 'react';
 import { useBooking } from '../hooks/useBooking';
 
 interface BookingProps {
-    readonly onNavigate?: (screen: string) => void;
+    readonly onNavigate?: (screen: string, payload?: any) => void;
+    readonly payload?: any;
 }
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-const Booking: React.FC<BookingProps> = ({ onNavigate }) => {
+const Booking: React.FC<BookingProps> = ({ onNavigate, payload }) => {
     const {
         clientSearch,
         setClientSearch,
@@ -40,7 +41,8 @@ const Booking: React.FC<BookingProps> = ({ onNavigate }) => {
         hasAvailableSlots,
         isValidSelection,
         blockReason,
-    } = useBooking();
+        isEditing,
+    } = useBooking(payload);
 
     // Hooks MUST be called before any returns
     React.useEffect(() => {
@@ -85,7 +87,7 @@ const Booking: React.FC<BookingProps> = ({ onNavigate }) => {
                     >
                         <span className="material-symbols-outlined text-slate-900 dark:text-slate-100" translate="no">arrow_back_ios_new</span>
                     </button>
-                    <h1 className="text-lg font-bold tracking-tight">Novo Agendamento</h1>
+                    <h1 className="text-lg font-bold tracking-tight">{isEditing ? 'Editar Agendamento' : 'Novo Agendamento'}</h1>
                     <div className="size-10"></div>
                 </div>
             </header>

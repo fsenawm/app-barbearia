@@ -10,7 +10,10 @@ export interface SlotInfo {
     bookedByTime?: string;
 }
 
-export const useBooking = () => {
+export const useBooking = (payload?: any) => {
+    const editAppointmentId = payload?.editAppointmentId;
+    const isEditing = !!editAppointmentId;
+    
     const [allClients, setAllClients] = useState<Client[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -49,7 +52,26 @@ export const useBooking = () => {
                 ]);
                 setAllClients(clientsData);
                 setServices(servicesData);
-                if (servicesData.length > 0) {
+                
+                if (editAppointmentId) {
+                    // Quick way to get appointment. Since we don't have a getById, we'll fetch all upcoming and past to find it.
+                    // Or we could have added getById. Let's just find it from all if we can, or just wait for loadBookedTimes.
+                    // Let's add getById to storage, or just fetch from localDb directly here.
+                    const { localDb } = await import('../lib/localDb');
+                    const localApt = await localDb.appointments.get(editAppointmentId);
+                    if (localApt) {
+                        const dateObj = new Date(localApt.appointment_date + 'T12:00:00');
+                        setSelectedDate(dateObj);
+                        setCurrentMonth(dateObj.getMonth());
+                        setCurrentYear(dateObj.getFullYear());
+                        setSelectedTime(localApt.appointment_time);
+                        setIsConfirmed(localApt.is_confirmed);
+                        setSelectedService(localApt.service_id);
+                        
+                        const client = clientsData.find(c => c.id === localApt.client_id);
+                        if (client) setSelectedClient(client);
+                    }
+                } else if (servicesData.length > 0) {
                     setSelectedService(servicesData[0].id);
                 }
             } catch (error) {
@@ -59,7 +81,7 @@ export const useBooking = () => {
             }
         };
         loadData();
-    }, []);
+    }, [editAppointmentId]);
 
     // Calendar helpers
     const goToPreviousMonth = () => {
@@ -309,7 +331,9 @@ export const useBooking = () => {
             }
 
             const existing = await appointmentsStorage.getByDate(appointmentDateStr);
-            const freshMap = buildSlotMap(existing, times);
+            // Ignore the current appointment if editing
+            const existingFiltered = isEditing ? existing.filter(a => a.id !== editAppointmentId) : existing;
+            const freshMap = buildSlotMap(existingFiltered, times);
             const slotInfo = freshMap[selectedTime];
             if (slotInfo && slotInfo.status !== 'available') {
                 const occupiedBy = slotInfo.clientName || 'outro agendamento';
@@ -322,19 +346,28 @@ export const useBooking = () => {
         }
 
         try {
-            await appointmentsStorage.saveAppointment({
-                client_id: selectedClient.id,
-                service_id: selectedService,
-                appointment_date: appointmentDateStr,
-                appointment_time: selectedTime,
-                is_confirmed: isConfirmed
-            });
+            if (isEditing) {
+                await appointmentsStorage.updateAppointment(editAppointmentId, {
+                    client_id: selectedClient.id,
+                    service_id: selectedService,
+                    appointment_date: appointmentDateStr,
+                    appointment_time: selectedTime,
+                });
+            } else {
+                await appointmentsStorage.saveAppointment({
+                    client_id: selectedClient.id,
+                    service_id: selectedService,
+                    appointment_date: appointmentDateStr,
+                    appointment_time: selectedTime,
+                    is_confirmed: isConfirmed
+                });
+            }
 
             // Gerar link do WhatsApp
             const serviceObj = services.find(s => s.id === selectedService);
             const serviceLabel = serviceObj?.name || 'Serviço';
             const dayLabel = selectedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
-            const message = `Olá ${selectedClient.name}! Confirmamos seu agendamento para ${serviceLabel} no dia ${dayLabel} às ${selectedTime}. Até lá!`;
+            const message = `Olá ${selectedClient.name}! ${isEditing ? 'Seu agendamento foi atualizado para' : 'Confirmamos seu agendamento para'} ${serviceLabel} no dia ${dayLabel} às ${selectedTime}. Até lá!`;
             const encodedMessage = encodeURIComponent(message);
             const phoneDigits = selectedClient.phone.replace(/\D/g, '');
             const phoneWithCountry = phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`;
@@ -387,5 +420,6 @@ export const useBooking = () => {
         hasAvailableSlots: times.some(t => slotMap[t]?.status === 'available'),
         isValidSelection: !!selectedClient && !!selectedService && !!selectedTime,
         blockReason,
+        isEditing: !!editAppointmentId,
     };
 };
