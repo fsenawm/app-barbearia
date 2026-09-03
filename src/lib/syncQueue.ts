@@ -97,12 +97,32 @@ export async function fullSync(): Promise<void> {
     // First process any pending outgoing changes
     await processQueue();
 
+    // Helper to fetch all rows circumventing the 1000 row limit
+    const fetchAll = async (table: string, orderBy?: string) => {
+        let allData: any[] = [];
+        let start = 0;
+        const limit = 1000;
+        while (true) {
+            let query = supabase.from(table).select('*').range(start, start + limit - 1);
+            if (orderBy) {
+                query = query.order(orderBy, { ascending: false });
+            }
+            const { data, error } = await query;
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            allData = allData.concat(data);
+            if (data.length < limit) break;
+            start += limit;
+        }
+        return { data: allData };
+    };
+
     try {
-        // Pull all data from Supabase in parallel
+        // Pull all data from Supabase in parallel using fetchAll to prevent limit omissions
         const [clients, services, appointments, configs, blocks] = await Promise.all([
-            supabase.from('clients').select('*').order('name'),
-            supabase.from('services').select('*').order('name'),
-            supabase.from('appointments').select('*'),
+            fetchAll('clients', 'name'),
+            fetchAll('services', 'name'),
+            fetchAll('appointments', 'appointment_date'),
             supabase.from('schedule_config').select('*').order('day_index'),
             supabase.from('schedule_blocks').select('*').order('block_date'),
         ]);
