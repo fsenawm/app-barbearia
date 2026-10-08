@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAgenda } from '../hooks/useAgenda';
 import { settingsStorage } from '../utils/storage';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface AgendaProps {
     readonly onNavigate?: (screen: string, payload?: any) => void;
@@ -18,6 +19,9 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
     } = useAgenda();
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showPixOptionsModal, setShowPixOptionsModal] = useState(false);
+    const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+    const [pixPayloadData, setPixPayloadData] = useState<{payload: string, price: string, key: string} | null>(null);
     const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
 
     const selectedDayLabel = selectedDate.toLocaleDateString('pt-BR', {
@@ -33,32 +37,68 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
         if (!selectedAptId) return;
         
         try {
-            // Need a way to update payment method in useAgenda or storage directly
             const { appointmentsStorage } = await import('../utils/storage');
             await appointmentsStorage.updatePaymentMethod(selectedAptId, method);
             
             if (method === 'pix') {
                 const pixKey = await settingsStorage.getPixKey();
-                const apt = appointments.find(a => a.id === selectedAptId);
-                if (pixKey && apt) {
-                    const price = apt.servicePrice || 'o valor do serviço';
-                    const msg = `Olá ${apt.clientName}! 👋\n\nAqui está a nossa chave Pix para o pagamento de ${price}:\n\n*${pixKey}*\n\nObrigado pela preferência!`;
-                    const phone = apt.clientPhone.replace(/\D/g, '');
-                    const finalPhone = phone.startsWith('55') ? phone : `55${phone}`;
-                    window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                } else if (!pixKey) {
-                    alert('Chave Pix não configurada! Pagamento registrado, mas não foi possível enviar o WhatsApp.');
+                if (pixKey) {
+                    setShowPaymentModal(false);
+                    setShowPixOptionsModal(true);
+                    reload();
+                    return;
+                } else {
+                    alert('Chave Pix não configurada! Pagamento registrado, mas não foi possível gerar opções.');
                 }
             }
             
-            // Reload agenda
             reload();
+            setShowPaymentModal(false);
+            setSelectedAptId(null);
         } catch {
             alert('Erro ao confirmar pagamento.');
-        } finally {
             setShowPaymentModal(false);
             setSelectedAptId(null);
         }
+    };
+
+    const handlePixWhatsApp = async () => {
+        if (!selectedAptId) return;
+        try {
+            const pixKey = await settingsStorage.getPixKey();
+            const apt = appointments.find(a => a.id === selectedAptId);
+            if (pixKey && apt) {
+                const price = apt.servicePrice || 'o valor do serviço';
+                const msg = `Olá ${apt.clientName}! 👋\n\nAqui está a nossa chave Pix para o pagamento de ${price}:\n\n*${pixKey}*\n\nObrigado pela preferência!`;
+                const phone = apt.clientPhone.replace(/\D/g, '');
+                const finalPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+            }
+        } finally {
+            setShowPixOptionsModal(false);
+            setSelectedAptId(null);
+        }
+    };
+
+    const handlePixQrCode = async () => {
+        if (!selectedAptId) return;
+        const pixKey = await settingsStorage.getPixKey();
+        const apt = appointments.find(a => a.id === selectedAptId);
+        if (pixKey && apt) {
+            import('../utils/pix').then(({ generateStaticPixPayload }) => {
+                const price = apt.servicePrice || '0';
+                const payload = generateStaticPixPayload(pixKey, 'Barbearia', 'Brasil', price);
+                setPixPayloadData({ payload, price, key: pixKey });
+                setShowPixOptionsModal(false);
+                setShowQrCodeModal(true);
+            });
+        }
+    };
+
+    const handleCloseQrCode = () => {
+        setShowQrCodeModal(false);
+        setPixPayloadData(null);
+        setSelectedAptId(null);
     };
 
     return (
@@ -294,6 +334,78 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                                     <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Cartão</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Pix Options Modal */}
+            {showPixOptionsModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
+                        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <h3 className="font-bold text-lg">Opções do Pix</h3>
+                            <button onClick={() => { setShowPixOptionsModal(false); setSelectedAptId(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-3 flex flex-col gap-3">
+                            <button
+                                onClick={handlePixWhatsApp}
+                                className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all text-left"
+                            >
+                                <span className="material-symbols-outlined text-green-500 text-2xl">chat</span>
+                                <div>
+                                    <span className="font-bold block">Enviar WhatsApp</span>
+                                    <span className="text-xs text-slate-500">Mandar chave pro cliente</span>
+                                </div>
+                            </button>
+                            <button
+                                onClick={handlePixQrCode}
+                                className="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all text-left"
+                            >
+                                <span className="material-symbols-outlined text-teal-500 text-2xl">qr_code_2</span>
+                                <div>
+                                    <span className="font-bold block">Gerar QR Code na tela</span>
+                                    <span className="text-xs text-slate-500">Para o cliente escanear agora</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* QR Code Modal */}
+            {showQrCodeModal && pixPayloadData && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
+                        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center relative">
+                            <h3 className="font-bold text-lg">Pagamento via Pix</h3>
+                            <button onClick={handleCloseQrCode} className="absolute right-5 top-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div className="p-6 flex flex-col items-center justify-center text-center space-y-4">
+                            <p className="text-sm text-slate-500">Peça para o cliente escanear o QR Code abaixo com o aplicativo do banco.</p>
+                            
+                            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
+                                <QRCodeCanvas value={pixPayloadData.payload} size={200} level="M" />
+                            </div>
+                            
+                            <div className="mt-2">
+                                <p className="text-xs text-slate-400">Valor a pagar</p>
+                                <p className="font-bold text-2xl text-slate-800 dark:text-slate-100">{pixPayloadData.price}</p>
+                            </div>
+
+                            <p className="text-xs font-mono bg-slate-100 dark:bg-slate-800 p-2 rounded w-full break-all text-slate-500 mt-2">
+                                {pixPayloadData.key}
+                            </p>
+
+                            <button
+                                onClick={handleCloseQrCode}
+                                className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-primary/90 transition-colors"
+                            >
+                                OK, Fechar
+                            </button>
                         </div>
                     </div>
                 </div>
