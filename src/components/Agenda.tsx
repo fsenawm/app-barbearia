@@ -9,6 +9,14 @@ interface AgendaProps {
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+const formatCurrency = (val: string | null | undefined) => {
+    if (!val) return '';
+    const numeric = val.replace(/[^\d.,]/g, '').replace(',', '.');
+    const floatVal = parseFloat(numeric);
+    if (isNaN(floatVal)) return val;
+    return floatVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
 const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
     const {
         appointments, isLoading, selectedDate,
@@ -68,8 +76,9 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
             const pixKey = await settingsStorage.getPixKey();
             const apt = appointments.find(a => a.id === selectedAptId);
             if (pixKey && apt) {
-                const price = apt.servicePrice || 'o valor do serviço';
-                const msg = `Olá ${apt.clientName}! 👋\n\nAqui está a nossa chave Pix para o pagamento de ${price}:\n\n*${pixKey}*\n\nObrigado pela preferência!`;
+                const price = apt.paid_amount || apt.servicePrice || 'o valor do serviço';
+                const formattedPrice = price === 'o valor do serviço' ? price : formatCurrency(price);
+                const msg = `Olá ${apt.clientName}! 👋\n\nAqui está a nossa chave Pix para o pagamento de ${formattedPrice}:\n\n*${pixKey}*\n\nObrigado pela preferência!`;
                 const phone = apt.clientPhone.replace(/\D/g, '');
                 const finalPhone = phone.startsWith('55') ? phone : `55${phone}`;
                 window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -86,7 +95,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
         const apt = appointments.find(a => a.id === selectedAptId);
         if (pixKey && apt) {
             import('../utils/pix').then(({ generateStaticPixPayload }) => {
-                const price = apt.servicePrice || '0';
+                const price = apt.paid_amount || apt.servicePrice || '0';
                 const payload = generateStaticPixPayload(pixKey, 'Barbearia', 'Brasil', price);
                 setPixPayloadData({ payload, price, key: pixKey });
                 setShowPixOptionsModal(false);
@@ -95,7 +104,25 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
         }
     };
 
-    const handleCloseQrCode = () => {
+    const handlePixPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!pixPayloadData) return;
+        const newPrice = e.target.value;
+        import('../utils/pix').then(({ generateStaticPixPayload }) => {
+            const payload = generateStaticPixPayload(pixPayloadData.key, 'Barbearia', 'Brasil', newPrice);
+            setPixPayloadData({ ...pixPayloadData, payload, price: newPrice });
+        });
+    };
+
+    const handleCloseQrCode = async () => {
+        if (selectedAptId && pixPayloadData) {
+            try {
+                const { appointmentsStorage } = await import('../utils/storage');
+                await appointmentsStorage.updateAppointment(selectedAptId, { paid_amount: pixPayloadData.price });
+                reload();
+            } catch (err) {
+                console.error(err);
+            }
+        }
         setShowQrCodeModal(false);
         setPixPayloadData(null);
         setSelectedAptId(null);
@@ -236,7 +263,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                                                 <div className="mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-700/50">
                                                     <p className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{apt.serviceName}</p>
                                                     {apt.servicePrice && (
-                                                        <p className="text-xs font-bold text-slate-500 mt-0.5">{apt.servicePrice} • {apt.serviceDuration}</p>
+                                                        <p className="text-xs font-bold text-slate-500 mt-0.5">{formatCurrency(apt.paid_amount || apt.servicePrice)} • {apt.serviceDuration}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -391,9 +418,18 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                                 <QRCodeCanvas value={pixPayloadData.payload} size={200} level="M" />
                             </div>
                             
-                            <div className="mt-2">
+                            <div className="mt-2 w-full max-w-[200px]">
                                 <p className="text-xs text-slate-400">Valor a pagar</p>
-                                <p className="font-bold text-2xl text-slate-800 dark:text-slate-100">{pixPayloadData.price}</p>
+                                <div className="flex items-center justify-center mt-1 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden">
+                                    <span className="pl-3 text-slate-500 font-bold">R$</span>
+                                    <input 
+                                        type="text" 
+                                        inputMode="decimal"
+                                        value={pixPayloadData.price.replace(/[^\d.,]/g, '')} 
+                                        onChange={handlePixPriceChange}
+                                        className="w-full bg-transparent text-center font-bold text-2xl text-slate-800 dark:text-slate-100 py-2 outline-none"
+                                    />
+                                </div>
                             </div>
 
                             <p className="text-xs font-mono bg-slate-100 dark:bg-slate-800 p-2 rounded w-full break-all text-slate-500 mt-2">

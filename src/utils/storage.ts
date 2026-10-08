@@ -30,6 +30,7 @@ export interface Appointment {
     appointment_time: string;
     is_confirmed: boolean;
     payment_method?: string | null;
+    paid_amount?: string | null;
 }
 
 export interface AppointmentWithDetails extends Appointment {

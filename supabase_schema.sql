@@ -28,6 +28,7 @@ create table appointments (
   appointment_time text not null,
   is_confirmed boolean default true,
   payment_method text,
+  paid_amount text,
   created_at timestamptz default now()
 );
 
