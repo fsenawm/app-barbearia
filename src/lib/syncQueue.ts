@@ -119,17 +119,18 @@ export async function fullSync(): Promise<void> {
 
     try {
         // Pull all data from Supabase in parallel using fetchAll to prevent limit omissions
-        const [clients, services, appointments, configs, blocks] = await Promise.all([
+        const [clients, services, appointments, configs, blocks, settings] = await Promise.all([
             fetchAll('clients', 'name'),
             fetchAll('services', 'name'),
             fetchAll('appointments', 'appointment_date'),
             supabase.from('schedule_config').select('*').order('day_index'),
             supabase.from('schedule_blocks').select('*').order('block_date'),
+            supabase.from('settings').select('*').limit(1),
         ]);
 
         // Replace local data with remote data (inside a transaction)
         await localDb.transaction('rw',
-            [localDb.clients, localDb.services, localDb.appointments, localDb.schedule_config, localDb.schedule_blocks],
+            [localDb.clients, localDb.services, localDb.appointments, localDb.schedule_config, localDb.schedule_blocks, localDb.settings],
             async () => {
                 if (clients.data) {
                     await localDb.clients.clear();
@@ -150,6 +151,10 @@ export async function fullSync(): Promise<void> {
                 if (blocks.data) {
                     await localDb.schedule_blocks.clear();
                     await localDb.schedule_blocks.bulkPut(blocks.data);
+                }
+                if (settings.data && settings.data.length > 0) {
+                    await localDb.settings.clear();
+                    await localDb.settings.bulkPut(settings.data);
                 }
             }
         );

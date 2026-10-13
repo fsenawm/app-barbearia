@@ -29,6 +29,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showPixOptionsModal, setShowPixOptionsModal] = useState(false);
     const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+    const [copiedPix, setCopiedPix] = useState(false);
     const [pixPayloadData, setPixPayloadData] = useState<{payload: string, price: string, key: string} | null>(null);
     const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
 
@@ -56,7 +57,7 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                     reload();
                     return;
                 } else {
-                    alert('Chave Pix não configurada! Pagamento registrado, mas não foi possível gerar opções.');
+                    alert('Cadastre sua chave Pix em Serviços para poder gerar QR Code.');
                 }
             }
             
@@ -74,8 +75,12 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
         if (!selectedAptId) return;
         try {
             const pixKey = await settingsStorage.getPixKey();
+            if (!pixKey) {
+                alert('Cadastre sua chave Pix em Serviços para poder gerar QR Code.');
+                return;
+            }
             const apt = appointments.find(a => a.id === selectedAptId);
-            if (pixKey && apt) {
+            if (apt) {
                 const price = apt.paid_amount || apt.servicePrice || 'o valor do serviço';
                 const formattedPrice = price === 'o valor do serviço' ? price : formatCurrency(price);
                 const msg = `Olá ${apt.clientName}! 👋\n\nAqui está a nossa chave Pix para o pagamento de ${formattedPrice}:\n\n*${pixKey}*\n\nObrigado pela preferência!`;
@@ -92,10 +97,14 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
     const handlePixQrCode = async () => {
         if (!selectedAptId) return;
         const pixKey = await settingsStorage.getPixKey();
+        if (!pixKey) {
+            alert('Cadastre sua chave Pix em Serviços para poder gerar QR Code.');
+            return;
+        }
         const apt = appointments.find(a => a.id === selectedAptId);
-        if (pixKey && apt) {
+        if (apt) {
             import('../utils/pix').then(({ generateStaticPixPayload }) => {
-                const price = apt.paid_amount || apt.servicePrice || '0';
+                const price = apt.paid_amount || apt.servicePrice || '';
                 const payload = generateStaticPixPayload(pixKey, 'Barbearia', 'Brasil', price);
                 setPixPayloadData({ payload, price, key: pixKey });
                 setShowPixOptionsModal(false);
@@ -437,8 +446,23 @@ const Agenda: React.FC<AgendaProps> = ({ onNavigate }) => {
                             </p>
 
                             <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(pixPayloadData.payload);
+                                    setCopiedPix(true);
+                                    setTimeout(() => setCopiedPix(false), 2000);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-sm">
+                                    {copiedPix ? 'check' : 'content_copy'}
+                                </span>
+                                {copiedPix ? 'Código Pix copiado!' : 'Copiar código Pix (Copia e Cola)'}
+                            </button>
+
+                            <button
                                 onClick={handleCloseQrCode}
-                                className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-primary/90 transition-colors"
+                                className="w-full mt-2 bg-primary text-white font-bold py-3 rounded-xl hover:bg-primary/90 transition-colors"
                             >
                                 OK, Fechar
                             </button>

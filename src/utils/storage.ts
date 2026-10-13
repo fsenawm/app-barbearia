@@ -529,7 +529,20 @@ export const scheduleStorage = {
 export const settingsStorage = {
     getPixKey: async (): Promise<string | null> => {
         const local = await localDb.settings.toCollection().first();
-        return local?.pix_key || null;
+        if (local?.pix_key) return local.pix_key;
+
+        if (isOnline()) {
+            try {
+                const { data } = await supabase.from('settings').select('*').limit(1).maybeSingle();
+                if (data?.pix_key) {
+                    await localDb.settings.put(data);
+                    return data.pix_key;
+                }
+            } catch (err) {
+                console.error('[Settings] Fetch pix_key from Supabase failed:', err);
+            }
+        }
+        return null;
     },
 
     savePixKey: async (pixKey: string) => {
